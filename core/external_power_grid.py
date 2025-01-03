@@ -33,7 +33,7 @@ class ExternalPowerGrid:
                 self._prices.append(electricity_prices[date])
 
     def curr_price(self, datetime: Schedule) -> float:
-        weekday = datetime.weekday()
+        weekday = datetime.weekday
         hour = datetime.hour
         return self._prices[weekday][hour]
 
