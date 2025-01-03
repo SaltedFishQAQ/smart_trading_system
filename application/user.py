@@ -19,11 +19,7 @@ class User:
         return self._market[(datetime.weekday, datetime.hour)]
 
     def get_supply(self, datetime: Schedule) -> list[Trade]:
-        market = self.get_market_information(datetime)
-        if market is None:
-            return []
-
-        # TODO: get price
+        # TODO: prices decision
         price = 30
         supply_list = []
         for device in self.device_list:
@@ -39,11 +35,7 @@ class User:
         return supply_list
 
     def get_demand(self, datetime: Schedule) -> list[Trade]:
-        market = self.get_market_information(datetime)
-        if market is None:
-            return []
-
-        # TODO: get price
+        # TODO: prices decision
         price = 30
         demand_list = []
         for device in self.device_list:

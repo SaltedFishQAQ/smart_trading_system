@@ -21,12 +21,16 @@ class Schedule:
         self._weekday += self._hour // 24
         self._hour = self._hour % 24
 
+        return self
+
     def pre(self):
         if self.has_pre() is False:
             return
         self._hour -= 1
         self._weekday += self._hour // 24
         self._hour = self._hour % 24
+
+        return self
 
     def has_next(self):
         if self._weekday < 6 or self._hour < 23:

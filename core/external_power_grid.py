@@ -1,4 +1,6 @@
+import sys
 from core.base import Schedule
+from collections import defaultdict
 
 # Data source: https://www.mercatoelettrico.org/en-us/Home/Results/Electricity/MGP/Results/ZonalPrices
 # price:€/MWh
@@ -22,8 +24,9 @@ electricity_prices = {
 
 class ExternalPowerGrid:
     def __init__(self):
+        self.name = 'MainGrid'
         self._prices = None
-        self._bill = {}
+        self._bill = defaultdict(float)
         self.init()
 
     def init(self):
@@ -36,6 +39,10 @@ class ExternalPowerGrid:
         weekday = datetime.weekday
         hour = datetime.hour
         return self._prices[weekday][hour]
+
+    @staticmethod
+    def supply(_):
+        return sys.float_info.max
 
     def allocate(self, target, demand, datetime: Schedule):
         self._bill[target] += demand * self.curr_price(datetime)

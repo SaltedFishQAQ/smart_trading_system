@@ -98,8 +98,8 @@ class Appliances(Device):
         return EnergyMode.Consumer
 
     def charge(self, datetime: Schedule, amount):
-        diff = min(self._demand, amount)
-        self._demand -= diff
+        diff = min(self._demand[datetime.weekday][datetime.hour], amount)
+        self._demand[datetime.weekday][datetime.hour] -= diff
 
         return diff
 
@@ -140,7 +140,7 @@ class Other(Device):
 
 
 def convert_to_device(config, name):
-    device_id = str(uuid.uuid4())[:8]
+    device_id = f'{name}:{str(uuid.uuid4())[:6]}'
     if name == 'solar_panels':
         device = SolarPanels(device_id)
     elif name == 'ev':

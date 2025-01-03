@@ -7,12 +7,13 @@ class ESS(Device):  # Energy storage system
     def __init__(self, cap):
         super().__init__('ESS', 'energy storage system')
         self._cap = cap
+        self._energy = cap*0.5
 
     def supply(self, _):
         return self._energy
 
     def charge(self, _, amount):
-        self._energy = min(self._energy+amount, self._cap)  # no more than capacity
+        self._energy = min(self._energy + amount, self._cap)  # no more than capacity
 
     def discharge(self, _, amount):
         diff = min(amount, self._energy)  # no less than 0
@@ -43,7 +44,8 @@ class PCC:  # Point of common coupling
 
 class Microgrids:
     def __init__(self, name):
-        self._ess = ESS(10000)
+        self.name = name
+        self._ess = ESS(100000)
         self.ess_id = self._ess.device_id
         self.external = ExternalPowerGrid()
         self.external_pcc = PCC(name, self.external)
@@ -52,19 +54,40 @@ class Microgrids:
         self.register(self._ess)
 
     def register(self, device: Device):
-        if device.energy_mode() | EnergyMode.Producer == EnergyMode.Producer:
+        if device.energy_mode() & EnergyMode.Producer == EnergyMode.Producer:
             self.DERs[device.device_id] = device
-        if device.energy_mode() | EnergyMode.Consumer == EnergyMode.Consumer:
+        if device.energy_mode() & EnergyMode.Consumer == EnergyMode.Consumer:
             self.consumers[device.device_id] = device
 
     def power_flow(self, src_id, dst_id, datetime: Schedule, amount):
-        if src_id not in self.DERs or dst_id not in self.consumers:
+        if dst_id not in self.consumers:
             return 'device not found'
-        producer = self.DERs[src_id]
         consumer = self.consumers[dst_id]
-        flow = producer.discharge(datetime, amount)
+
+        if src_id in self.DERs:
+            producer = self.DERs[src_id]
+            flow = producer.discharge(datetime, amount)
+        elif src_id == self.external.name:
+            flow = self.external.allocate(self.name, amount, datetime)
+        else:
+            return 'device not found'
         consumer.charge(datetime, flow)
 
         # power from src to dst
         print(f'{src_id} provide {flow} units of electricity energy to {dst_id}')
 
+    def get_supply(self, datetime: Schedule) -> list[dict]:
+        supply_list = [{
+                'amount': self._ess.supply(datetime),
+                'price': self.external.curr_price(datetime) * 0.9,
+                'supplier_id': self.name,
+                'supplier_device_id': self.ess_id
+            },
+            {
+                'amount': self.external.supply(datetime),
+                'price': self.external.curr_price(datetime) * 0.9,
+                'supplier_id': self.external.name,
+                'supplier_device_id': self.external.name
+            }]
+
+        return supply_list

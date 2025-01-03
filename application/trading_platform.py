@@ -20,7 +20,7 @@ class DSM:  # Demand side management
 
     def predict_market(self, datetime: Schedule):
         predict = MarketInformation()
-        if datetime.has_pre():
+        if datetime.has_pre() and len(self._market_information) > 0:
             # TODO: predict supply and demand
             pre_datetime = datetime.copy().pre()
             predict = self._market_information[(pre_datetime.weekday, pre_datetime.hour)]
@@ -29,6 +29,8 @@ class DSM:  # Demand side management
         return predict
 
     def record_market(self, datetime: Schedule, trade_list: list[Trade]):
+        if len(trade_list) == 0:
+            return
         data = MarketInformation()
         data.external_price = self.external.curr_price(datetime)
         if (datetime.weekday, datetime.hour) in self._market_information:
@@ -65,67 +67,128 @@ class TradingPlatform:
         self.market_manager.predict_market(datetime)  # predicting supply and demand
 
         round_number = 1
-        while True:
-            self.notify_market(datetime)  # notify user
+        last_round = False
+        supply_list = []
+        demand_list = []
+        while last_round is False:
+            if round_number == 5:
+                last_round = True
 
-            supply_list = self.get_supply_list()  # collect supply
-            demand_list = self.get_demand_list()  # collect demand
+            self.notify_market(datetime, last_round)  # notify user
+
+            supply_list = self.get_supply_list(datetime)  # collect supply
+            demand_list = self.get_demand_list(datetime)  # collect demand
             if len(demand_list) == 0 or len(supply_list) == 0:
                 break
 
-            trade_list = self.match_trades(supply_list, demand_list)  # trade matching
+            supply_list = sorted(copy.deepcopy(supply_list), key=lambda x: x.price)
+            demand_list = sorted(copy.deepcopy(demand_list), key=lambda x: x.price, reverse=True)
+
+            trade_list = self.match_trades(datetime, supply_list, demand_list, last_round)  # trade matching
             self.allocator.distribute_energy(trade_list, datetime)  # distribute energy by trade
 
             self.market_manager.record_market(datetime, trade_list)  # record trade
 
-            if round_number > 5:
-                break
             round_number += 1
 
-    def notify_market(self, datetime: Schedule):
-        for user in self.users.values():
-            user.update_market_information(datetime, self.market_manager.market_information(datetime))
+        self.finishing_touches(datetime, supply_list, demand_list)
 
-    def get_supply_list(self):
+    def notify_market(self, datetime: Schedule, last: bool):
+        curr_market = self.market_manager.market_information(datetime)
+        curr_market.last = last
+        for user in self.users.values():
+            user.update_market_information(datetime, curr_market)
+
+    def get_supply_list(self, datetime: Schedule):
         result = []
         for user in self.users.values():
-            result.extend(user.get_supply())
+            result.extend(user.get_supply(datetime))
         return result
 
-    def get_demand_list(self):
+    def get_demand_list(self, datetime: Schedule):
         result = []
         for user in self.users.values():
-            result.extend(user.get_demand())
+            result.extend(user.get_demand(datetime))
         return result
 
-    @staticmethod
-    def match_trades(supply_list: list[Trade], demand_list: list[Trade]):
-        # TODO: matching algorithm
-        supply_list = sorted(copy.deepcopy(supply_list), key=lambda x: x.price)
-        demand_list = sorted(copy.deepcopy(demand_list), key=lambda x: x.price, reverse=True)
+    def match_trades(self, datetime: Schedule, supply_list: list[Trade], demand_list: list[Trade], last: bool):
+        max_price = self.microgrids.external.curr_price(datetime)
+
         trade_list = []
         while supply_list and demand_list:
             supply = supply_list[0]
             demand = demand_list[0]
-            if supply.price <= demand.price:
-                amount = min(supply.amount, demand.amount)
-                price = (supply.price + demand.price) / 2
+            if supply.price >= max_price:
+                break
 
-                trade_list.append(Trade(
-                    amount=amount,
-                    price=price,
-                    supplier_id=supply.supplier_id,
-                    supplier_device_id=supply.supplier_device_id,
-                    consumer_id=demand.consumer_id,
-                    consumer_device_id=demand.consumer_device_id
-                ))
-                supply.amount -= amount
-                demand.amount -= amount
-                if supply.amount == 0:
-                    supply_list.pop(0)
-                if demand.amount == 0:
-                    demand_list.pop(0)
+            amount = min(supply.amount, demand.amount)
+            if supply.price <= demand.price:  # trade matching phase
+                price = (supply.price + demand.price) / 2
+            elif last:  # settlement phase
+                price = supply.price
             else:
                 break
 
+            trade_list.append(Trade(
+                amount=amount,
+                price=price,
+                supplier_id=supply.supplier_id,
+                supplier_device_id=supply.supplier_device_id,
+                consumer_id=demand.consumer_id,
+                consumer_device_id=demand.consumer_device_id
+            ))
+
+            if supply.amount == amount:
+                supply_list.pop(0)
+            else:
+                supply_list[0] = supply.refresh_amount(supply.amount - amount)
+            if demand.amount == amount:
+                demand_list.pop(0)
+            else:
+                demand_list[0] = demand.refresh_amount(demand.amount - amount)
+
         return trade_list
+
+    def finishing_touches(self, datetime: Schedule, supply_list: list[Trade], demand_list: list[Trade]):
+        trade_list = []
+        for supply in supply_list:
+            price = 0
+            trade_list.append(Trade(
+                amount=supply.amount,
+                price=price,
+                supplier_id=supply.supplier_id,
+                supplier_device_id=supply.supplier_device_id,
+                consumer_id=self.microgrids.name,
+                consumer_device_id=self.microgrids.ess_id
+            ))
+
+        self.allocator.distribute_energy(trade_list, datetime)
+        self.market_manager.record_market(datetime, trade_list)
+
+        final_supply_list = self.microgrids.get_supply(datetime)
+        index = 0
+        while demand_list:
+            supply = final_supply_list[index]
+            if index == 0 and supply['amount'] == 0:
+                index = 1
+                continue
+            demand = demand_list[0]
+            amount = min(supply['amount'], demand.amount)
+
+            trade_list.append(Trade(
+                amount=amount,
+                price=supply['price'],
+                supplier_id=supply['supplier_id'],
+                supplier_device_id=supply['supplier_device_id'],
+                consumer_id=demand.consumer_id,
+                consumer_device_id=demand.consumer_device_id
+            ))
+
+            supply['amount'] -= amount
+            if demand.amount == amount:
+                demand_list.pop(0)
+            else:
+                demand_list[0] = demand.refresh_amount(demand.amount-amount)
+
+        self.allocator.distribute_energy(trade_list, datetime)
+        self.market_manager.record_market(datetime, trade_list)

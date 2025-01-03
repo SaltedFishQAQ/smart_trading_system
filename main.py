@@ -28,6 +28,7 @@ if __name__ == '__main__':
     # start
     datetime = Schedule()
     while True:
+        print(f'-------- weekday: {datetime.weekday}, hour: {datetime.hour} --------')
         platform.handle(datetime)
         if datetime.has_next() is False:
             break

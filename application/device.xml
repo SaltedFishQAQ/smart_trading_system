@@ -1,28 +1,28 @@
 <config>
     <user>
         <user1>
-            <solar_panels>1</solar_panels>
+            <solar_panels>10</solar_panels>
             <ev>1</ev>
             <appliances>4</appliances>
             <computer>1</computer>
             <heater>1</heater>
         </user1>
         <user2>
-            <solar_panels>2</solar_panels>
+            <solar_panels>7</solar_panels>
             <appliances>4</appliances>
         </user2>
         <user3>
-            <solar_panels>1</solar_panels>
+            <solar_panels>3</solar_panels>
             <appliances>3</appliances>
             <computer>1</computer>
         </user3>
         <user4>
-            <solar_panels>1</solar_panels>
+            <solar_panels>3</solar_panels>
             <appliances>4</appliances>
             <computer>2</computer>
         </user4>
         <user5>
-            <solar_panels>2</solar_panels>
+            <solar_panels>8</solar_panels>
             <ev>1</ev>
             <appliances>5</appliances>
             <oven>1</oven>
@@ -36,12 +36,12 @@
             <appliances>4</appliances>
         </user7>
         <user8>
-            <solar_panels>2</solar_panels>
+            <solar_panels>10</solar_panels>
             <appliances>6</appliances>
             <oven>1</oven>
         </user8>
         <user9>
-            <solar_panels>1</solar_panels>
+            <solar_panels>9</solar_panels>
             <appliances>3</appliances>
             <computer>1</computer>
             <oven>1</oven>
