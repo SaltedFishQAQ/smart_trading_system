@@ -54,15 +54,15 @@
         </user10>
     </user>
     <computer>
-        <average>30</average>
+        <average>200</average>
         <frequency>6</frequency>
     </computer>
     <heater>
-        <average>100</average>
+        <average>1500</average>
         <frequency>24</frequency>
     </heater>
     <oven>
-        <average>100</average>
+        <average>500</average>
         <frequency>84</frequency>
     </oven>
 </config>

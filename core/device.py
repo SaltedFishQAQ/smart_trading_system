@@ -33,7 +33,11 @@ class SolarPanels(Device):
         self.init()
 
     def init(self):
-        self._energy = np.full((7, 24), 100)
+        self._energy = np.full((7, 24), 0)
+        offset = random.randint(7, 13)
+        duration = random.randint(4, 6)
+        for daily_energy in self._energy:
+            daily_energy[offset:offset+duration] = np.random.randint(240, 270, size=duration)
 
     def supply(self, datetime: Schedule):
         return self._energy[datetime.weekday, datetime.hour]
@@ -57,7 +61,7 @@ class EV(Device):
         self.init()
 
     def init(self):
-        self._demand = 500
+        self._demand = random.randint(50*1000, 75*1000) / 0.85
 
     def demand(self, _):
         return self._demand
@@ -81,7 +85,8 @@ class Appliances(Device):
         self.init()
 
     def init(self):
-        self._demand = np.random.randint(20, 31, size=(7, 24))
+        per_cost = random.randint(50, 200)
+        self._demand = np.full((7, 24), per_cost)
 
     def demand(self, datetime: Schedule):
         return self._demand[datetime.weekday][datetime.hour]
