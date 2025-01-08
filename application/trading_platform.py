@@ -1,9 +1,11 @@
 import copy
+import numpy as np
 from core.microgrids import Microgrids
 from core.base import Schedule
 from application.base import Trade
 from application.user import User
 from application.base import MarketInformation
+from application.algorithms.market import forecast_price
 from core.external_power_grid import ExternalPowerGrid
 
 
@@ -13,26 +15,34 @@ class DSM:  # Demand side management
         self.external = external
 
     def market_information(self, datetime: Schedule):
-        if (datetime.weekday, datetime.hour) in self._market_information:
-            return self._market_information[(datetime.weekday, datetime.hour)]
+        if (datetime.weekday, datetime.hour) not in self._market_information:
+            self._market_information[(datetime.weekday, datetime.hour)] = self.predict_market(datetime)
 
-        return self.predict_market(datetime)
+        return self._market_information[(datetime.weekday, datetime.hour)]
 
     def predict_market(self, datetime: Schedule):
-        predict = MarketInformation()
+        predict_market = MarketInformation()
+        # supply and demand
         if datetime.has_pre() and len(self._market_information) > 0:
             # TODO: predict supply and demand
             pre_datetime = datetime.copy().pre()
-            predict = self._market_information[(pre_datetime.weekday, pre_datetime.hour)]
-        predict.external_price = self.external.curr_price(datetime)
+            predict_market = self._market_information[(pre_datetime.weekday, pre_datetime.hour)]
+        # external_price_hour
+        predict_market.external_price_hour = self.external.curr_price(datetime)
+        # external_price_day = [...history_data, ...predict_data]
+        offset = datetime.hour+1
+        history_data = self.external.get_history_data(datetime)
+        predict_data = forecast_price(np.arange(1, len(history_data) + 1), history_data, 24-offset)
+        predict_market.external_price_day = np.concatenate((history_data[-offset:], predict_data.tolist()))
+        self.external.compare_prices(datetime, predict_market.external_price_day)
 
-        return predict
+        return predict_market
 
     def record_market(self, datetime: Schedule, trade_list: list[Trade]):
         if len(trade_list) == 0:
             return
         data = MarketInformation()
-        data.external_price = self.external.curr_price(datetime)
+        data.external_price_hour = self.external.curr_price(datetime)
         if (datetime.weekday, datetime.hour) in self._market_information:
             data = self._market_information[(datetime.weekday, datetime.hour)]
 
@@ -64,8 +74,6 @@ class TradingPlatform:
             self.microgrids.register(device)
 
     def handle(self, datetime: Schedule):
-        self.market_manager.predict_market(datetime)  # predicting supply and demand
-
         round_number = 1
         last_round = False
         supply_list = []

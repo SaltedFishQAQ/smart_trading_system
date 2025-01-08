@@ -25,6 +25,7 @@ class MarketInformation:
     def __init__(self):
         self.supply = {}
         self.demand = {}
-        self.external_price = 0
+        self.external_price_hour = 0
+        self.external_price_day = None
         self.trade_list = []
         self.last = False
