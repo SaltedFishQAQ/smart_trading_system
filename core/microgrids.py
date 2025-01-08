@@ -85,7 +85,7 @@ class Microgrids:
             },
             {
                 'amount': self.external.supply(datetime),
-                'price': self.external.curr_price(datetime) * 0.9,
+                'price': self.external.curr_price(datetime),
                 'supplier_id': self.external.name,
                 'supplier_device_id': self.external.name
             }]
