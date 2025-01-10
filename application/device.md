@@ -8,6 +8,8 @@
 
 ### EV
 > EV battery capacity, taking a neutral EV as an example (**50 - 75 kWh**).
+> But we only need to consider the actual usage, according to the needs of weekday commuting and weekend play.
+> Commuting 20 km round trip for example (**4kWh**), and Weekend trips 50 km a day for example (**10kWh**).
 > Charging efficiency is set to 0.85.
 
 

@@ -61,10 +61,12 @@ class EV(Device):
         self.init()
 
     def init(self):
-        self._demand = random.randint(50*1000, 75*1000) / 0.85
+        weekday = 4 * 1000 / 0.85
+        weekend = 10 * 1000 / 0.85
+        self._demand = {i: (weekday if i < 5 else weekend) for i in range(7)}
 
-    def demand(self, _):
-        return self._demand
+    def demand(self, datetime: Schedule):
+        return self._demand[datetime.weekday]
 
     def mode(self):
         return DeviceMode.ONCE
@@ -73,8 +75,9 @@ class EV(Device):
         return EnergyMode.Consumer
 
     def charge(self, datetime: Schedule, amount):
-        diff = min(self._demand, amount)
-        self._demand -= diff
+        demand = self._demand[datetime.weekday]
+        diff = min(demand, amount)
+        self._demand[datetime.weekday] -= diff
 
         return diff
 
@@ -132,7 +135,7 @@ class Other(Device):
 
         if self._demand == 0:
             (weekday, hour) = self.offset
-            weekday = (weekday + self.frequency/24) % 7
+            weekday = (weekday + self.frequency / 24) % 7
             hour = (hour + self.frequency % 24) % 24
             self.offset = (weekday, hour)
 
@@ -148,7 +151,7 @@ def convert_to_device(config, name):
     elif name == 'appliances':
         device = Appliances(device_id)
     else:
-        demand, frequency = 20, 24*7
+        demand, frequency = 20, 24 * 7
         if name in config:
             demand = int(config[name]['average'])
             frequency = int(config[name]['frequency'])

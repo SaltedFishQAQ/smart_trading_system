@@ -33,7 +33,7 @@ class DSM:  # Demand side management
         offset = datetime.hour+1
         history_data = self.external.get_history_data(datetime)
         predict_data = forecast_price(np.arange(1, len(history_data) + 1), history_data, 24-offset)
-        predict_market.external_price_day = np.concatenate((history_data[-offset:], predict_data.tolist()))
+        predict_market.external_price_day = np.concatenate((history_data[-offset:], predict_data))
         self.external.compare_prices(datetime, predict_market.external_price_day)
 
         return predict_market
