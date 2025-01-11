@@ -37,3 +37,8 @@ class Printer:
         plt.ylabel('trade amount')
         plt.xlabel('trade mode')
         plt.show()
+
+    def print_into_excel(self):
+        df = pd.DataFrame(self.data)
+        output_file = "energy_flow_output.xlsx"
+        df.to_excel(output_file, index=False)

@@ -106,3 +106,6 @@ class Microgrids:
 
     def print_by_mode(self):
         self.printer.print_by_mode()
+
+    def print_into_excel(self):
+        self.printer.print_into_excel()
