@@ -32,5 +32,6 @@ if __name__ == '__main__':
         platform.handle(datetime)
         if datetime.has_next() is False:
             break
+        microgrids.print_flow(datetime)
         datetime.next()
-
+    microgrids.print_by_mode()

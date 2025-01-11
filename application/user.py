@@ -2,7 +2,7 @@ import copy
 
 from core.base import Schedule
 from core.device import Device, DeviceMode
-from application.base import Trade
+from application.base import Trade, TradeMode
 from application.base import MarketInformation
 from application.algorithms.user import predict_prices
 
@@ -47,6 +47,15 @@ class User:
                 supply = supply_list_cp[0]
                 demand = demand_list_cp[0]
                 amount = min(supply['supply'], demand['demand'])
+                trade_self_list.append(Trade(
+                    supplier_id=self.user_id,
+                    supplier_device_id=supply['id'],
+                    consumer_id=self.user_id,
+                    consumer_device_id=demand['id'],
+                    price=sell,
+                    amount=amount,
+                    mode=TradeMode.SELF_USE
+                ))
                 if supply['supply'] == amount:
                     supply_list_cp.pop(0)
                 else:

@@ -1,6 +1,8 @@
-from core.external_power_grid import ExternalPowerGrid
+from utils.printer import Printer
 from core.device import Device, DeviceMode
 from core.base import EnergyMode, Schedule
+from application.base import Trade
+from core.external_power_grid import ExternalPowerGrid
 
 
 class ESS(Device):  # Energy storage system
@@ -52,6 +54,7 @@ class Microgrids:
         self.DERs = {}  # distributed energy resources
         self.consumers = {}
         self.register(self._ess)
+        self.printer = Printer()
 
     def register(self, device: Device):
         if device.energy_mode() & EnergyMode.Producer == EnergyMode.Producer:
@@ -59,7 +62,11 @@ class Microgrids:
         if device.energy_mode() & EnergyMode.Consumer == EnergyMode.Consumer:
             self.consumers[device.device_id] = device
 
-    def power_flow(self, src_id, dst_id, datetime: Schedule, amount):
+    def power_flow(self, trade: Trade, datetime: Schedule):
+        src_id = trade.supplier_device_id
+        dst_id = trade.consumer_device_id
+        amount = trade.amount
+
         if dst_id not in self.consumers:
             return 'device not found'
         consumer = self.consumers[dst_id]
@@ -72,9 +79,11 @@ class Microgrids:
         else:
             return 'device not found'
         consumer.charge(datetime, flow)
-
+        data = trade.to_json()
+        data['datetime'] = f'{datetime.weekday}:{datetime.hour}'
+        self.printer.add_data(data)
         # power from src to dst
-        print(f'{src_id} provide {flow} units of electricity energy to {dst_id}')
+        print(f'[{trade.mode.name}] {src_id} provide {flow} units of electricity energy to {dst_id}')
 
     def get_supply(self, datetime: Schedule) -> list[dict]:
         supply_list = [{
@@ -91,3 +100,9 @@ class Microgrids:
             }]
 
         return supply_list
+
+    def print_flow(self, datetime: Schedule):
+        self.printer.print_by_datetime_and_user(f'{datetime.weekday}:{datetime.hour}')
+
+    def print_by_mode(self):
+        self.printer.print_by_mode()

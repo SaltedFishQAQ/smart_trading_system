@@ -2,7 +2,7 @@ import copy
 import numpy as np
 from core.microgrids import Microgrids
 from core.base import Schedule
-from application.base import Trade
+from application.base import Trade, TradeMode
 from application.user import User
 from application.base import MarketInformation
 from application.algorithms.market import predict_external_price, predict_supply_demand
@@ -86,7 +86,7 @@ class DMS:  # Distribution management systems
 
     def distribute_energy(self, trade_list: list[Trade], datetime: Schedule):
         for trade in trade_list:
-            self.microgrids.power_flow(trade.supplier_device_id, trade.consumer_device_id, datetime, trade.amount)
+            self.microgrids.power_flow(trade, datetime)
 
 
 class TradingPlatform:
@@ -183,7 +183,8 @@ class TradingPlatform:
                 supplier_id=supply.supplier_id,
                 supplier_device_id=supply.supplier_device_id,
                 consumer_id=demand.consumer_id,
-                consumer_device_id=demand.consumer_device_id
+                consumer_device_id=demand.consumer_device_id,
+                mode=TradeMode.MARKET
             ))
 
             if supply.amount == amount:
@@ -207,7 +208,8 @@ class TradingPlatform:
                 supplier_id=supply.supplier_id,
                 supplier_device_id=supply.supplier_device_id,
                 consumer_id=self.microgrids.name,
-                consumer_device_id=self.microgrids.ess_id
+                consumer_device_id=self.microgrids.ess_id,
+                mode=TradeMode.TO_ESS
             ))
 
         self.allocator.distribute_energy(trade_list, datetime)
@@ -229,7 +231,8 @@ class TradingPlatform:
                 supplier_id=supply['supplier_id'],
                 supplier_device_id=supply['supplier_device_id'],
                 consumer_id=demand.consumer_id,
-                consumer_device_id=demand.consumer_device_id
+                consumer_device_id=demand.consumer_device_id,
+                mode=TradeMode.FROM_EXTERNAL
             ))
 
             supply['amount'] -= amount

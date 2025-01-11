@@ -1,4 +1,12 @@
+from enum import Enum
 from dataclasses import dataclass
+
+
+class TradeMode(Enum):
+    SELF_USE = 'self_use'
+    MARKET = 'market'
+    FROM_EXTERNAL = 'from_external'
+    TO_ESS = 'to_ess'
 
 
 @dataclass(frozen=True)
@@ -9,6 +17,7 @@ class Trade:
     supplier_device_id: str = 0
     consumer_id: str = 0
     consumer_device_id: str = 0
+    mode: TradeMode = TradeMode.MARKET
 
     def refresh_amount(self, new_value):
         return Trade(
@@ -17,8 +26,20 @@ class Trade:
             supplier_id=self.supplier_id,
             supplier_device_id=self.supplier_device_id,
             consumer_id=self.consumer_id,
-            consumer_device_id=self.consumer_device_id
+            consumer_device_id=self.consumer_device_id,
+            mode=self.mode
         )
+
+    def to_json(self):
+        return {
+            'supplier_id': self.supplier_id,
+            'supplier_device_id': self.supplier_device_id,
+            'consumer_id': self.consumer_id,
+            'consumer_device_id': self.consumer_device_id,
+            'amount': self.amount,
+            'price': self.price,
+            'mode': self.mode.name
+        }
 
 
 class MarketInformation:
