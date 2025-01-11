@@ -5,8 +5,11 @@ from core.base import Schedule
 from application.base import Trade
 from application.user import User
 from application.base import MarketInformation
-from application.algorithms.market import forecast_price
+from application.algorithms.market import predict_external_price, predict_supply_demand
 from core.external_power_grid import ExternalPowerGrid
+
+
+MAX_ROUND = 5
 
 
 class DSM:  # Demand side management
@@ -24,19 +27,34 @@ class DSM:  # Demand side management
         predict_market = MarketInformation()
         # supply and demand
         if datetime.has_pre() and len(self._market_information) > 0:
-            # TODO: predict supply and demand
             pre_datetime = datetime.copy().pre()
-            predict_market = self._market_information[(pre_datetime.weekday, pre_datetime.hour)]
+            pre_market = self._market_information[(pre_datetime.weekday, pre_datetime.hour)]
+            predict_market.prices = copy.deepcopy(pre_market.prices)
+            predict_market.amount = copy.deepcopy(pre_market.amount)
+            predict_market.supply_demand_ratio = copy.deepcopy(pre_market.supply_demand_ratio)
+        else:
+            predict_market.prices = [0] * MAX_ROUND
+            predict_market.amount = [0] * MAX_ROUND
+            predict_market.supply_demand_ratio = [1] * MAX_ROUND
+
         # external_price_hour
         predict_market.external_price_hour = self.external.curr_price(datetime)
         # external_price_day = [...history_data, ...predict_data]
         offset = datetime.hour+1
         history_data = self.external.get_history_data(datetime)
-        predict_data = forecast_price(np.arange(1, len(history_data) + 1), history_data, 24-offset)
+        predict_data = predict_external_price(np.arange(1, len(history_data) + 1), history_data, 24 - offset)
         predict_market.external_price_day = np.concatenate((history_data[-offset:], predict_data))
         self.external.compare_prices(datetime, predict_market.external_price_day)
 
         return predict_market
+
+    def adjust_market(self, datetime: Schedule, round_number):
+        curr_market = self.market_information(datetime)
+        if datetime.has_pre() and len(self._market_information) > 0:
+            pre_datetime = datetime.copy().pre()
+            pre_market = self._market_information[(pre_datetime.weekday, pre_datetime.hour)]
+            predict_supply_demand(pre_market.supply_demand_ratio, pre_market.prices,
+                                  curr_market.supply_demand_ratio, curr_market.prices, round_number)
 
     def record_market(self, datetime: Schedule, trade_list: list[Trade]):
         if len(trade_list) == 0:
@@ -47,9 +65,19 @@ class DSM:  # Demand side management
             data = self._market_information[(datetime.weekday, datetime.hour)]
 
         data.trade_list.extend(trade_list)
+        prices = 0
+        amount = 0
+        index = data.round_number-1
+        if data.last:
+            amount = data.amount[index]
+            prices = data.prices[index]*amount
+
         for trade in trade_list:
-            data.supply[trade.price] = data.supply.get(trade.price, 0) + trade.amount
-            data.demand[trade.price] = data.demand.get(trade.price, 0) + trade.amount
+            prices += trade.price * trade.amount
+            amount += trade.amount
+        if amount > 0:
+            data.prices[index] = prices/amount
+            data.amount[index] = amount
 
 
 class DMS:  # Distribution management systems
@@ -67,6 +95,7 @@ class TradingPlatform:
         self.market_manager = DSM(self.microgrids.external)
         self.allocator = DMS(microgrids)
         self.users = {}
+        self.max_round = MAX_ROUND
 
     def register_user(self, user: User):
         self.users[user.user_id] = user
@@ -79,13 +108,12 @@ class TradingPlatform:
         supply_list = []
         demand_list = []
         while last_round is False:
-            if round_number == 5:
+            if round_number == self.max_round:
                 last_round = True
 
-            self.notify_market(datetime, last_round)  # notify user
+            self.notify_market(datetime, round_number, last_round)  # notify user
 
-            supply_list = self.get_supply_list(datetime)  # collect supply
-            demand_list = self.get_demand_list(datetime)  # collect demand
+            supply_list, demand_list = self.get_supply_demand_list(datetime)  # collect supply and demand
             if len(demand_list) == 0 or len(supply_list) == 0:
                 break
 
@@ -94,30 +122,42 @@ class TradingPlatform:
 
             trade_list = self.match_trades(datetime, supply_list, demand_list, last_round)  # trade matching
             self.allocator.distribute_energy(trade_list, datetime)  # distribute energy by trade
-
             self.market_manager.record_market(datetime, trade_list)  # record trade
 
             round_number += 1
 
         self.finishing_touches(datetime, supply_list, demand_list)
 
-    def notify_market(self, datetime: Schedule, last: bool):
+    def notify_market(self, datetime: Schedule, round_number, last: bool):
         curr_market = self.market_manager.market_information(datetime)
+        curr_market.round_number = round_number
         curr_market.last = last
         for user in self.users.values():
             user.update_market_information(datetime, curr_market)
 
-    def get_supply_list(self, datetime: Schedule):
-        result = []
+    def get_supply_demand_list(self, datetime: Schedule):
+        total_supply_list, total_demand_list, total_trade_list = [], [], []
+        total_supply = 0
+        total_demand = 0
         for user in self.users.values():
-            result.extend(user.get_supply(datetime))
-        return result
+            supply_list, demand_list, trade_list = user.get_supply_demand(datetime)
+            for supply in supply_list:
+                total_supply += supply.amount
+            for demand in demand_list:
+                total_demand += demand.amount
+            total_supply_list.extend(supply_list)
+            total_demand_list.extend(demand_list)
+            total_trade_list.extend(trade_list)
+        self.allocator.distribute_energy(total_trade_list, datetime)  # energy for own use
 
-    def get_demand_list(self, datetime: Schedule):
-        result = []
-        for user in self.users.values():
-            result.extend(user.get_demand(datetime))
-        return result
+        curr_market = self.market_manager.market_information(datetime)
+        index = curr_market.round_number-1
+        if total_supply > 0 and total_demand > 0:
+            curr_market.supply_demand_ratio[index] = total_supply/total_demand
+        else:
+            curr_market.supply_demand_ratio[index] = 0
+
+        return total_supply_list, total_demand_list
 
     def match_trades(self, datetime: Schedule, supply_list: list[Trade], demand_list: list[Trade], last: bool):
         max_price = self.microgrids.external.curr_price(datetime)
