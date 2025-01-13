@@ -46,7 +46,7 @@ class MarketInformation:
     def __init__(self):
         self.prices = []
         self.amount = []
-        self.supply_demand_ratio = []
+        self.supply_demand_ratio = None
         self.external_price_hour = 0
         self.external_price_day = None
         self.trade_list = []

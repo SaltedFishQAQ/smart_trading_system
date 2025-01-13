@@ -35,7 +35,7 @@ class DSM:  # Demand side management
         else:
             predict_market.prices = [0] * MAX_ROUND
             predict_market.amount = [0] * MAX_ROUND
-            predict_market.supply_demand_ratio = [1] * MAX_ROUND
+            predict_market.supply_demand_ratio = np.array([1] * MAX_ROUND)
 
         # external_price_hour
         predict_market.external_price_hour = self.external.curr_price(datetime)
@@ -124,6 +124,7 @@ class TradingPlatform:
             self.allocator.distribute_energy(trade_list, datetime)  # distribute energy by trade
             self.market_manager.record_market(datetime, trade_list)  # record trade
 
+            self.market_manager.adjust_market(datetime, round_number)
             round_number += 1
 
         self.finishing_touches(datetime, supply_list, demand_list)
